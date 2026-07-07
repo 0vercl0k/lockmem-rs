@@ -1,0 +1,80 @@
+name: Builds
+
+on: [push, pull_request]
+
+jobs:
+  fmt:
+    runs-on: windows-latest
+    name: fmt
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v7
+
+      - name: Set up rust
+        run: rustup default nightly
+
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+
+      - name: cargo fmt
+        run: cargo +nightly fmt --check
+
+  clippy:
+    name: clippy
+    runs-on: windows-latest
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v7
+
+      - name: Set up rust
+        run: rustup default stable
+
+      - name: cargo clippy
+        env:
+          RUSTFLAGS: "-Dwarnings"
+        run: cargo clippy --workspace --tests --examples
+
+  doc:
+    name: doc
+    runs-on: windows-latest
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v7
+
+      - name: Set up rust
+        run: rustup default stable
+
+      - name: cargo doc
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
+        run: cargo doc
+
+  build:
+    runs-on: windows-latest
+    name: build & test
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v7
+
+      - name: Set up rust
+        run: rustup default stable
+
+      - name: cargo test
+        run: cargo test --all-targets
+
+      - name: cargo test release
+        run: cargo test --release --all-targets
+
+      - name: cargo check
+        run: cargo check --all-targets
+
+      - name: cargo build
+        run: cargo build --release --all-targets
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: lockmem-rs
+          path: |
+            target/release/lockmem-rs.exe
+            target/release/lockmem_rs.pdb
