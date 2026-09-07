@@ -17,9 +17,9 @@ use crate::bindings_sys::{
     STATUS_SUCCESS, STATUS_WAS_LOCKED, SetProcessWorkingSetSizeEx, VirtualQueryEx,
 };
 use crate::error::{Error, Result};
-use crate::from;
 use crate::handle::{Handle, ProcessHandle};
 use crate::human::ToHuman;
+use crate::try_from_usize;
 
 #[link(name = "ntdll")]
 unsafe extern "system" {
@@ -143,7 +143,7 @@ impl Process {
 
     pub fn grown_and_lock_mem(&self, range: Range<u64>) -> Result<u64> {
         const MAP_PROCESS: u32 = 1;
-        let mut range_len = from!(usize, range.end - range.start);
+        let mut range_len = try_from_usize!(range.end - range.start);
         let mut start = range.start;
         let status = unsafe {
             NtLockVirtualMemory(
@@ -187,7 +187,7 @@ impl Process {
         .ok()?;
 
         // XXX: no need to double?
-        let range_len = from!(usize, range.end - range.start);
+        let range_len = try_from_usize!(range.end - range.start);
         minimum_ws_len += range_len;
         maximum_ws_len += range_len;
 

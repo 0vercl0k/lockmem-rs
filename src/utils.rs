@@ -15,9 +15,15 @@ use crate::error::{Error, Result};
 use crate::handle::Handle;
 
 #[macro_export]
-macro_rules! from {
+macro_rules! try_from {
     ($t: ty, $v: expr) => {
         <$t>::try_from($v).unwrap()
+    };
+}
+#[macro_export]
+macro_rules! try_from_usize {
+    ($v: expr) => {
+        usize::try_from($v).unwrap()
     };
 }
 
@@ -64,12 +70,12 @@ pub(crate) enum TokenKind {
 }
 
 pub(crate) fn relaunch_elevated(target: &str) -> Result<()> {
-    let mut path = vec![0; from!(usize, MAX_PATH)];
+    let mut path = vec![0; try_from_usize!(MAX_PATH)];
     let path_len =
         unsafe { GetModuleFileNameA(None, PSTR(path.as_mut_ptr()), path.len().try_into()?) };
     assert!(path_len > 0);
 
-    path.resize(from!(usize, path_len), 0);
+    path.resize(try_from_usize!(path_len), 0);
     let path = CString::new(path).unwrap();
 
     let params = CString::new(format!("--elevated {target}")).unwrap();
@@ -116,7 +122,7 @@ pub(crate) fn limited_token() -> Result<TokenKind> {
         .as_bool()
     );
 
-    assert_eq!(from!(usize, needed), size_of_val(&token_ty));
+    assert_eq!(try_from_usize!(needed), size_of_val(&token_ty));
 
     Ok(match token_ty {
         0 => TokenKind::Default,

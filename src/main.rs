@@ -46,8 +46,8 @@ fn lockmem(p: &mut Process) -> Result<()> {
     let mut spinner = 0;
     let mut last_update = Instant::now().checked_sub(Duration::from_mins(1)).unwrap();
     for m in p.iter_mem()? {
-        let start = from!(u64, m.BaseAddress.addr());
-        let end = start.saturating_add(from!(u64, m.RegionSize));
+        let start = try_from!(u64, m.BaseAddress.addr());
+        let end = start.saturating_add(try_from!(u64, m.RegionSize));
         let range = start..end;
 
         if (m.State & (MEM_FREE | MEM_RESERVE)) != 0 {

@@ -1,5 +1,5 @@
 // Axel '0vercl0k' Souchet - August 20 2023
-use std::ops::{self, Deref};
+use std::ops::Deref;
 use std::path::PathBuf;
 
 use log::debug;
@@ -12,7 +12,7 @@ use crate::bindings_sys::{
     QueryFullProcessImageNameW, STATUS_INFO_LENGTH_MISMATCH,
 };
 use crate::utils::AlignedAlloc;
-use crate::{Result, from};
+use crate::{Result, try_from, try_from_usize};
 
 /// A [`HANDLE`] that gets closed automatically if owned.
 #[derive(Debug)]
@@ -25,7 +25,7 @@ pub struct Handle {
 // regardless it is safe to send across threads.
 unsafe impl Send for Handle {}
 
-impl ops::Deref for Handle {
+impl Deref for Handle {
     type Target = HANDLE;
 
     fn deref(&self) -> &Self::Target {
@@ -150,7 +150,7 @@ impl ProcessHandle {
         );
 
         let mut info =
-            AlignedAlloc::<PUBLIC_OBJECT_TYPE_INFORMATION>::new(from!(usize, needed_len));
+            AlignedAlloc::<PUBLIC_OBJECT_TYPE_INFORMATION>::new(try_from_usize!(needed_len));
         let status = unsafe {
             NtQueryObject(
                 Some(*handle),
@@ -179,7 +179,7 @@ impl ProcessHandle {
 
     pub fn query_full_process_image_name(&self) -> Result<PathBuf> {
         let mut buffer = [0u16; MAX_PATH as usize];
-        let mut buffer_len = from!(u32, buffer.len());
+        let mut buffer_len = try_from!(u32, buffer.len());
 
         unsafe {
             QueryFullProcessImageNameW(
