@@ -8,7 +8,7 @@ use log::debug;
 use windows_core::NTSTATUS;
 
 use crate::bindings::{
-    PROCESS_QUERY_INFORMATION, PROCESS_SET_QUOTA, PROCESS_VM_OPERATION, PROCESS_VM_READ,
+    PROCESS_QUERY_INFORMATION, PROCESS_SET_QUOTA, PROCESS_VM_OPERATION,
     QUOTA_LIMITS_HARDWS_MAX_DISABLE, QUOTA_LIMITS_HARDWS_MIN_ENABLE, TH32CS_SNAPPROCESS,
 };
 use crate::bindings_sys::{
@@ -215,10 +215,7 @@ impl Process {
     pub fn from_pid(pid: u32) -> Result<Option<Self>> {
         let handle = Handle::adopt(unsafe {
             OpenProcess(
-                PROCESS_SET_QUOTA
-                    | PROCESS_QUERY_INFORMATION
-                    | PROCESS_VM_OPERATION
-                    | PROCESS_VM_READ,
+                PROCESS_SET_QUOTA | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION,
                 false,
                 pid,
             )

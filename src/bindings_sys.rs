@@ -6,6 +6,27 @@
     clippy::cast_possible_wrap
 )]
 #[inline]
+pub unsafe fn AdjustTokenPrivileges(
+    tokenhandle: HANDLE,
+    disableallprivileges: bool,
+    newstate: Option<*const TOKEN_PRIVILEGES>,
+    bufferlength: u32,
+    previousstate: Option<*mut TOKEN_PRIVILEGES>,
+    returnlength: Option<*mut u32>,
+) -> windows_core::BOOL {
+    windows_core::link!("advapi32.dll" "system" fn AdjustTokenPrivileges(tokenhandle : HANDLE, disableallprivileges : windows_core::BOOL, newstate : *const TOKEN_PRIVILEGES, bufferlength : u32, previousstate : *mut TOKEN_PRIVILEGES, returnlength : *mut u32) -> windows_core::BOOL);
+    unsafe {
+        AdjustTokenPrivileges(
+            tokenhandle,
+            disableallprivileges.into(),
+            newstate.unwrap_or(core::mem::zeroed()) as _,
+            bufferlength,
+            previousstate.unwrap_or(core::mem::zeroed()) as _,
+            returnlength.unwrap_or(core::mem::zeroed()) as _,
+        )
+    }
+}
+#[inline]
 pub unsafe fn CloseHandle(hobject: HANDLE) -> windows_core::BOOL {
     windows_core::link!("kernel32.dll" "system" fn CloseHandle(hobject : HANDLE) -> windows_core::BOOL);
     unsafe { CloseHandle(hobject) }
@@ -49,19 +70,9 @@ pub unsafe fn GetCurrentProcess() -> HANDLE {
     unsafe { GetCurrentProcess() }
 }
 #[inline]
-pub unsafe fn GetModuleFileNameA(
-    hmodule: Option<HMODULE>,
-    lpfilename: windows_core::PSTR,
-    nsize: u32,
-) -> u32 {
-    windows_core::link!("kernel32.dll" "system" fn GetModuleFileNameA(hmodule : HMODULE, lpfilename : windows_core::PSTR, nsize : u32) -> u32);
-    unsafe {
-        GetModuleFileNameA(
-            hmodule.unwrap_or(core::mem::zeroed()) as _,
-            lpfilename,
-            nsize,
-        )
-    }
+pub unsafe fn GetLastError() -> u32 {
+    windows_core::link!("kernel32.dll" "system" fn GetLastError() -> u32);
+    unsafe { GetLastError() }
 }
 #[inline]
 pub unsafe fn GetProcessId(process: HANDLE) -> u32 {
@@ -106,6 +117,45 @@ pub unsafe fn GetTokenInformation(
             tokeninformation.unwrap_or(core::mem::zeroed()) as _,
             tokeninformationlength,
             returnlength as _,
+        )
+    }
+}
+#[inline]
+pub unsafe fn LookupPrivilegeNameA<P0>(
+    lpsystemname: P0,
+    lpluid: *const LUID,
+    lpname: Option<windows_core::PSTR>,
+    cchname: *mut u32,
+) -> windows_core::BOOL
+where
+    P0: windows_core::Param<windows_core::PCSTR>,
+{
+    windows_core::link!("advapi32.dll" "system" fn LookupPrivilegeNameA(lpsystemname : windows_core::PCSTR, lpluid : *const LUID, lpname : windows_core::PSTR, cchname : *mut u32) -> windows_core::BOOL);
+    unsafe {
+        LookupPrivilegeNameA(
+            lpsystemname.param().abi(),
+            lpluid,
+            lpname.unwrap_or(core::mem::zeroed()) as _,
+            cchname as _,
+        )
+    }
+}
+#[inline]
+pub unsafe fn LookupPrivilegeValueA<P0, P1>(
+    lpsystemname: P0,
+    lpname: P1,
+    lpluid: *mut LUID,
+) -> windows_core::BOOL
+where
+    P0: windows_core::Param<windows_core::PCSTR>,
+    P1: windows_core::Param<windows_core::PCSTR>,
+{
+    windows_core::link!("advapi32.dll" "system" fn LookupPrivilegeValueA(lpsystemname : windows_core::PCSTR, lpname : windows_core::PCSTR, lpluid : *mut LUID) -> windows_core::BOOL);
+    unsafe {
+        LookupPrivilegeValueA(
+            lpsystemname.param().abi(),
+            lpname.param().abi(),
+            lpluid as _,
         )
     }
 }
@@ -185,33 +235,6 @@ pub unsafe fn SetProcessWorkingSetSizeEx(
     }
 }
 #[inline]
-pub unsafe fn ShellExecuteA<P1, P2, P3, P4>(
-    hwnd: Option<HWND>,
-    lpoperation: P1,
-    lpfile: P2,
-    lpparameters: P3,
-    lpdirectory: P4,
-    nshowcmd: i32,
-) -> HINSTANCE
-where
-    P1: windows_core::Param<windows_core::PCSTR>,
-    P2: windows_core::Param<windows_core::PCSTR>,
-    P3: windows_core::Param<windows_core::PCSTR>,
-    P4: windows_core::Param<windows_core::PCSTR>,
-{
-    windows_core::link!("shell32.dll" "system" fn ShellExecuteA(hwnd : HWND, lpoperation : windows_core::PCSTR, lpfile : windows_core::PCSTR, lpparameters : windows_core::PCSTR, lpdirectory : windows_core::PCSTR, nshowcmd : i32) -> HINSTANCE);
-    unsafe {
-        ShellExecuteA(
-            hwnd.unwrap_or(core::mem::zeroed()) as _,
-            lpoperation.param().abi(),
-            lpfile.param().abi(),
-            lpparameters.param().abi(),
-            lpdirectory.param().abi(),
-            nshowcmd,
-        )
-    }
-}
-#[inline]
 pub unsafe fn VirtualQueryEx(
     hprocess: HANDLE,
     lpaddress: Option<*const core::ffi::c_void>,
@@ -230,18 +253,24 @@ pub unsafe fn VirtualQueryEx(
 }
 pub const DUPLICATE_SAME_ACCESS: i32 = 2;
 pub const ENABLE_VIRTUAL_TERMINAL_PROCESSING: i32 = 4;
+pub const ERROR_NOT_ALL_ASSIGNED: i32 = 1300;
 pub const E_ACCESSDENIED: windows_core::HRESULT = windows_core::HRESULT(0x80070005_u32 as _);
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct HANDLE(pub *mut core::ffi::c_void);
-#[repr(transparent)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct HINSTANCE(pub *mut core::ffi::c_void);
-pub type HMODULE = HINSTANCE;
-#[repr(transparent)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct HWND(pub *mut core::ffi::c_void);
 pub const INVALID_HANDLE_VALUE: HANDLE = HANDLE(-1 as _);
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct LUID {
+    pub LowPart: u32,
+    pub HighPart: i32,
+}
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct LUID_AND_ATTRIBUTES {
+    pub Luid: LUID,
+    pub Attributes: u32,
+}
 pub const MAX_PATH: i32 = 260;
 #[repr(C)]
 #[cfg(target_arch = "x86")]
@@ -300,7 +329,6 @@ impl Default for PROCESSENTRY32W {
 pub const PROCESS_QUERY_INFORMATION: i32 = 1024;
 pub const PROCESS_SET_QUOTA: i32 = 256;
 pub const PROCESS_VM_OPERATION: i32 = 8;
-pub const PROCESS_VM_READ: i32 = 16;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PUBLIC_OBJECT_TYPE_INFORMATION {
@@ -314,6 +342,8 @@ impl Default for PUBLIC_OBJECT_TYPE_INFORMATION {
 }
 pub const QUOTA_LIMITS_HARDWS_MAX_DISABLE: i32 = 8;
 pub const QUOTA_LIMITS_HARDWS_MIN_ENABLE: i32 = 1;
+pub const SE_PRIVILEGE_ENABLED: i32 = 2;
+pub const SE_PRIVILEGE_ENABLED_BY_DEFAULT: i32 = 1;
 pub const STATUS_INCOMPATIBLE_FILE_MAP: windows_core::NTSTATUS =
     windows_core::NTSTATUS(0xC000004D_u32 as _);
 pub const STATUS_INFO_LENGTH_MISMATCH: windows_core::NTSTATUS =
@@ -321,11 +351,22 @@ pub const STATUS_INFO_LENGTH_MISMATCH: windows_core::NTSTATUS =
 pub const STATUS_SUCCESS: windows_core::NTSTATUS = windows_core::NTSTATUS(0x0_u32 as _);
 pub const STATUS_WAS_LOCKED: windows_core::NTSTATUS = windows_core::NTSTATUS(0x40000019_u32 as _);
 pub const STD_OUTPUT_HANDLE: u32 = 4294967285;
-pub const SW_NORMAL: i32 = 1;
 pub const TH32CS_SNAPPROCESS: i32 = 2;
+pub const TOKEN_ADJUST_PRIVILEGES: i32 = 32;
 pub type TOKEN_INFORMATION_CLASS = i32;
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TOKEN_PRIVILEGES {
+    pub PrivilegeCount: u32,
+    pub Privileges: [LUID_AND_ATTRIBUTES; 1],
+}
+impl Default for TOKEN_PRIVILEGES {
+    fn default() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
 pub const TOKEN_QUERY: i32 = 8;
-pub const TokenElevationType: TOKEN_INFORMATION_CLASS = 18;
+pub const TokenPrivileges: TOKEN_INFORMATION_CLASS = 3;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct UNICODE_STRING {

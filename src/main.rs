@@ -7,10 +7,11 @@ mod bindings_sys;
 mod error;
 mod handle;
 mod human;
+mod privileges;
 mod process;
 mod utils;
 
-use std::io::{Read, Write};
+use std::io::Write;
 use std::num::Saturating;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
@@ -24,7 +25,8 @@ use crate::bindings::{MEM_FREE, MEM_RESERVE, PAGE_GUARD, PAGE_NOACCESS};
 use crate::bindings_sys::E_ACCESSDENIED;
 use crate::error::Error;
 use crate::human::ToHuman;
-use crate::utils::{TokenKind, limited_token, relaunch_elevated, turn_on_vt};
+use crate::privileges::PRIVILEGE_MANAGER;
+use crate::utils::turn_on_vt;
 
 const SPINNER: [&str; 4] = ["◐", "◓", "◑", "◒"];
 
@@ -108,56 +110,49 @@ fn lockmem(p: &mut Process) -> Result<()> {
     Ok(())
 }
 
-fn main() -> Result<()> {
+fn open_and_lockmem(pid_or_name: &str) -> Result<()> {
+    let p = match pid_or_name.parse::<u32>() {
+        Ok(pid) => Process::from_pid(pid),
+        Err(_) => Process::from_name(pid_or_name),
+    }?;
+
+    match p {
+        None => Err("no process found".into()),
+        Some(mut p) => lockmem(&mut p),
+    }
+}
+
+fn main() {
     #[cfg(debug_assertions)]
     env_logger::init();
 
     let mut args = env::args();
     if args.len() <= 1 {
-        println!("./lockmem-rs.exe <name | pid> [--elevated]");
-        return Ok(());
+        println!("./lockmem-rs.exe <name | pid>");
+        return;
     }
 
-    let elevated = args.len() >= 3;
     let pid_or_name = args.nth(1).unwrap();
-    if elevated {
-        assert_eq!(args.next().unwrap(), "--elevated");
-    }
-
-    let p = match pid_or_name.parse::<u32>() {
-        Ok(pid) => Process::from_pid(pid),
-        Err(_) => Process::from_name(&pid_or_name),
-    };
-
-    match p {
-        Ok(Some(mut p)) => {
-            lockmem(&mut p)?;
-        }
-        Ok(None) => panic!("no process found"),
+    match open_and_lockmem(&pid_or_name) {
+        Ok(()) => {}
         Err(Error::Win32(e)) => {
             if e.code() == E_ACCESSDENIED {
-                let kind = limited_token()?;
-                if matches!(kind, TokenKind::Limited) {
-                    println!("got ACCESSDENIED when openning the process from a limited token.");
-                    if elevated {
-                        println!("Re-spawning it as admin (accept UAC prompt)..");
-
-                        relaunch_elevated(&pid_or_name).unwrap();
-                    } else {
-                        println!("Try relaunching it running w/ --elevated.");
+                println!("got access denied.. trying to get SeDebugPrivilege..");
+                match PRIVILEGE_MANAGER.lock().unwrap().set_sedebug() {
+                    Ok(()) => {
+                        println!("got SeDebugPrivilege, trying again..");
+                        if let Err(e) = open_and_lockmem(&pid_or_name) {
+                            println!("failed again w/ {e}; maybe PPL?");
+                        }
                     }
-                } else {
-                    println!("bleh");
+                    Err(e) => {
+                        println!(
+                            "couldn't get SeDebugPrivilege (failed w/ {e}), try from an admin prompt?"
+                        );
+                    }
                 }
             }
         }
-        Err(e) => panic!("failed to open process w/ {e}"),
+        Err(e) => panic!("failed to open process: {e}"),
     }
-
-    if elevated {
-        println!("Press any key to exit this window.");
-        io::stdin().read_exact(&mut [0u8]).unwrap();
-    }
-
-    Ok(())
 }
