@@ -213,7 +213,7 @@ impl Process {
 
     /// Create a [`Process`] a process from a pid.
     pub fn from_pid(pid: u32) -> Result<Option<Self>> {
-        let handle = unsafe {
+        let handle = Handle::adopt(unsafe {
             OpenProcess(
                 PROCESS_SET_QUOTA
                     | PROCESS_QUERY_INFORMATION
@@ -222,9 +222,14 @@ impl Process {
                 false,
                 pid,
             )
-        };
+        });
 
-        let Some(h) = ProcessHandle::from_handle(Handle::adopt(handle)) else {
+        if handle.is_invalid() {
+            debug!("failed to open pid {pid}");
+            return Err(windows_core::Error::from_thread().into());
+        }
+
+        let Some(h) = ProcessHandle::from_handle(handle) else {
             debug!("failed to verify that the opened process handle is actually a process handle");
             return Ok(None);
         };

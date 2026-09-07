@@ -114,16 +114,16 @@ fn main() -> Result<()> {
 
     let mut args = env::args();
     if args.len() <= 1 {
-        println!("./lockmem-rs.exe <name | pid>");
+        println!("./lockmem-rs.exe <name | pid> [--elevated]");
         return Ok(());
     }
 
     let elevated = args.len() >= 3;
+    let pid_or_name = args.nth(1).unwrap();
     if elevated {
-        assert_eq!(args.nth(2).unwrap(), "--elevated");
+        assert_eq!(args.next().unwrap(), "--elevated");
     }
 
-    let pid_or_name = args.nth(1).unwrap();
     let p = match pid_or_name.parse::<u32>() {
         Ok(pid) => Process::from_pid(pid),
         Err(_) => Process::from_name(&pid_or_name),
@@ -137,12 +137,15 @@ fn main() -> Result<()> {
         Err(Error::Win32(e)) => {
             if e.code() == E_ACCESSDENIED {
                 let kind = limited_token()?;
-                println!("{kind:?}");
                 if matches!(kind, TokenKind::Limited) {
-                    println!(
-                        "got ACCESSDENIED when tried to open the process but you are running w/ a limited token, re-running as admin..(accept UAC prompt).."
-                    );
-                    relaunch_elevated(&pid_or_name).unwrap();
+                    println!("got ACCESSDENIED when openning the process from a limited token.");
+                    if elevated {
+                        println!("Re-spawning it as admin (accept UAC prompt)..");
+
+                        relaunch_elevated(&pid_or_name).unwrap();
+                    } else {
+                        println!("Try relaunching it running w/ --elevated.");
+                    }
                 } else {
                     println!("bleh");
                 }

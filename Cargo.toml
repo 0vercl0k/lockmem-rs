@@ -14,7 +14,6 @@ keywords = ["windows", "working-set", "NtLockVirtualMemory", "lock", "virtual me
 env_logger = "0.11"
 log = "0.4"
 windows-core =  "0.100"
-windows-link = "0.2"
 
 [build-dependencies]
 windows-bindgen = "0.100"

@@ -11,7 +11,7 @@ use crate::bindings_sys::{
     HANDLE, MAX_PATH, OpenProcessToken, STD_OUTPUT_HANDLE, SW_NORMAL, SetConsoleMode,
     ShellExecuteA, TokenElevationType,
 };
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::handle::Handle;
 
 #[macro_export]
@@ -93,9 +93,7 @@ pub(crate) fn relaunch_elevated(target: &str) -> Result<()> {
     };
 
     if status.0 as usize <= 32 {
-        Err(Error::Other(
-            format!("ShellExecuteA failed w/ {}", status.0 as usize).into(),
-        ))
+        Err(format!("ShellExecuteA failed w/ {}", status.0 as usize).into())
     } else {
         Ok(())
     }
@@ -125,10 +123,10 @@ pub(crate) fn limited_token() -> Result<TokenKind> {
     assert_eq!(try_from_usize!(needed), size_of_val(&token_ty));
 
     Ok(match token_ty {
-        0 => TokenKind::Default,
-        1 => TokenKind::Full,
+        1 => TokenKind::Default,
+        2 => TokenKind::Full,
         3 => TokenKind::Limited,
-        _ => panic!("unexpected value"),
+        v => panic!("unexpected value {v}"),
     })
 }
 
