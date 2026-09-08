@@ -21,7 +21,7 @@ The Windows kernel guarantees that those pages will stay resident in memory, not
 ## Installation
 
 ```text
-cargo install lockmem-rs
+cargo install lockmem-rs --locked
 ```
 
 ## Build
