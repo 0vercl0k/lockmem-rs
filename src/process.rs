@@ -1,6 +1,5 @@
 // Axel '0vercl0k' Souchet - December 6th 2024
 use std::ffi::c_void;
-use std::ops::ControlFlow;
 use std::ptr::null;
 use std::range::Range;
 
@@ -79,19 +78,6 @@ impl Processes {
         }
 
         Ok(ProcessesIter::new(h))
-    }
-
-    // XXX: any on the iterator?
-    pub fn find(
-        cb: impl Fn(&PROCESSENTRY32W) -> ControlFlow<()>,
-    ) -> Result<Option<PROCESSENTRY32W>> {
-        for pe32 in Self::iter()? {
-            if matches!(cb(&pe32), ControlFlow::Break(())) {
-                return Ok(Some(pe32));
-            }
-        }
-
-        Ok(None)
     }
 }
 
@@ -186,7 +172,6 @@ impl Process {
         }
         .ok()?;
 
-        // XXX: no need to double?
         let range_len = try_from_usize!(range.end - range.start);
         minimum_ws_len += range_len;
         maximum_ws_len += range_len;
@@ -236,7 +221,7 @@ impl Process {
 
     /// Find a process by its name.
     pub fn from_name(name: &str) -> Result<Option<Self>> {
-        let Some(pe32) = Processes::find(|pe32| {
+        let Some(pe32) = Processes::iter()?.find(|pe32| {
             let null_idx = pe32
                 .szExeFile
                 .iter()
@@ -245,13 +230,8 @@ impl Process {
                 .clamp(0, size_of_val(&pe32.szExeFile) - 1);
             let pname = String::from_utf16_lossy(&pe32.szExeFile[..null_idx]);
 
-            if pname.eq_ignore_ascii_case(name) {
-                ControlFlow::Break(())
-            } else {
-                ControlFlow::Continue(())
-            }
-        })?
-        else {
+            pname.eq_ignore_ascii_case(name)
+        }) else {
             debug!("failed to find process '{name}'");
             return Ok(None);
         };
