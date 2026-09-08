@@ -119,8 +119,8 @@ impl PrivilegeManager {
             )
             .into());
         }
-        let token = Handle::adopt(token);
 
+        let token = Handle::adopt(token);
         let mut needed = 0;
         assert!(
             !unsafe { GetTokenInformation(*token, TokenPrivileges, None, 0, &raw mut needed) }

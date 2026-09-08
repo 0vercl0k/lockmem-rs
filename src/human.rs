@@ -17,13 +17,6 @@ where
 {
 }
 
-// impl<T> ToHuman for Saturating<T>
-// where
-//     T: TryInto<u64>,
-//     T: Copy,
-// {
-// }
-
 /// Type that implements [`Display`] to print out a size in human form.
 pub struct HumanBytes<T>(T);
 
