@@ -1,0 +1,22 @@
+[package]
+name = "lockmem-rs"
+version = "0.1.0"
+edition = "2024"
+categories = ["command-line-utilities", "development-tools::debugging"]
+description = "Lock virtual memory regions of an arbitrary process into its working set."
+include = ["/Cargo.toml", "/LICENSE", "/src/**", "README.md"]
+authors = ["Axel '0vercl0k' Souchet"]
+license = "MIT"
+repository = "https://github.com/0vercl0k/lockmem-rs"
+keywords = ["windows", "working-set", "NtLockVirtualMemory", "lock", "virtual memory"]
+
+[dependencies]
+env_logger = "0.11"
+log = "0.4"
+windows-core =  "0.100"
+
+[build-dependencies]
+windows-bindgen = "0.100"
+
+[lints.clippy]
+pedantic = "warn"
