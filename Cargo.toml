@@ -8,7 +8,7 @@ include = ["/Cargo.toml", "/LICENSE", "/src/**", "README.md", "Cargo.lock"]
 authors = ["Axel '0vercl0k' Souchet"]
 license = "MIT"
 repository = "https://github.com/0vercl0k/lockmem-rs"
-keywords = ["windows", "working-set", "NtLockVirtualMemory", "lock", "virtual memory"]
+keywords = ["windows", "working-set", "NtLockVirtualMemory", "lock", "virtual-memory"]
 
 [dependencies]
 env_logger = "0.11"
