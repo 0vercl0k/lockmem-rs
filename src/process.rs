@@ -172,7 +172,6 @@ impl Process {
         }
         .ok()?;
 
-        let range_len = try_from_usize!(range.end - range.start);
         minimum_ws_len += range_len;
         maximum_ws_len += range_len;
 
@@ -185,6 +184,22 @@ impl Process {
 
         unsafe { SetProcessWorkingSetSizeEx(*self.handle, minimum_ws_len, maximum_ws_len, flags) }
             .ok()?;
+
+        let status = unsafe {
+            NtLockVirtualMemory(
+                *self.handle,
+                &raw mut start,
+                &raw mut range_len,
+                MAP_PROCESS,
+            )
+        };
+
+        if status != STATUS_SUCCESS {
+            debug!("second attempt locking {range:#x?} failed w/ {status:#?}");
+            return Err(format!("failed to lock {range:#x?} w/ {status:#?}").into());
+        }
+
+        debug!("second attempt locking {range:#x?} worked!");
 
         Ok(range.end - range.start)
     }
