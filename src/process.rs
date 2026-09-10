@@ -25,8 +25,8 @@ use crate::try_from_usize;
 unsafe extern "system" {
     pub fn NtLockVirtualMemory(
         ProcessHandle: HANDLE,
-        // This should be `usize` but because we explicitely only compile for 64-bit Windows
-        // target, this is fine.
+        // SAFETY: This should be `usize` but because we explicitely only compile for 64-bit
+        // Windows target, this is fine.
         BaseAddress: *mut u64,
         RegionSize: *mut usize,
         MapType: u32,
