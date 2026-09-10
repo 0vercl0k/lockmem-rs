@@ -13,7 +13,8 @@ use crate::bindings::{
 use crate::bindings_sys::{
     CreateToolhelp32Snapshot, GetProcessWorkingSetSizeEx, HANDLE, MEMORY_BASIC_INFORMATION,
     OpenProcess, PROCESSENTRY32W, Process32FirstW, Process32NextW, STATUS_INCOMPATIBLE_FILE_MAP,
-    STATUS_SUCCESS, STATUS_WAS_LOCKED, SetProcessWorkingSetSizeEx, VirtualQueryEx,
+    STATUS_SUCCESS, STATUS_WAS_LOCKED, STATUS_WORKING_SET_QUOTA, SetProcessWorkingSetSizeEx,
+    VirtualQueryEx,
 };
 use crate::error::{Error, Result};
 use crate::handle::{Handle, ProcessHandle};
@@ -157,7 +158,9 @@ impl Process {
             return Ok(range.end - range.start);
         }
 
-        debug!("NtLockVirtualMemory failed w/ {:#x}", status.0);
+        if status != STATUS_WORKING_SET_QUOTA {
+            return Err(format!("NtLockVirtualMemory failed w/ {status}").into());
+        }
 
         let mut minimum_ws_len = 0;
         let mut maximum_ws_len = 0;
@@ -196,7 +199,7 @@ impl Process {
 
         if status != STATUS_SUCCESS {
             debug!("second attempt locking {range:#x?} failed w/ {status:#?}");
-            return Err(format!("failed to lock {range:#x?} w/ {status:#?}").into());
+            return Err(format!("failed to NtLockVirtualMemory {range:#x?} w/ {status}").into());
         }
 
         debug!("second attempt locking {range:#x?} worked!");
@@ -223,7 +226,11 @@ impl Process {
 
         if handle.is_invalid() {
             debug!("failed to open pid {pid}");
-            return Err(windows_core::Error::from_thread().into());
+            return Err(format!(
+                "OpenProcess failed w/ {}",
+                windows_core::Error::from_thread()
+            )
+            .into());
         }
 
         let Some(h) = ProcessHandle::from_handle(handle) else {

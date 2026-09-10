@@ -350,6 +350,8 @@ pub const STATUS_INFO_LENGTH_MISMATCH: windows_core::NTSTATUS =
     windows_core::NTSTATUS(0xC0000004_u32 as _);
 pub const STATUS_SUCCESS: windows_core::NTSTATUS = windows_core::NTSTATUS(0x0_u32 as _);
 pub const STATUS_WAS_LOCKED: windows_core::NTSTATUS = windows_core::NTSTATUS(0x40000019_u32 as _);
+pub const STATUS_WORKING_SET_QUOTA: windows_core::NTSTATUS =
+    windows_core::NTSTATUS(0xC00000A1_u32 as _);
 pub const STD_OUTPUT_HANDLE: u32 = 4294967285;
 pub const TH32CS_SNAPPROCESS: i32 = 2;
 pub const TOKEN_ADJUST_PRIVILEGES: i32 = 32;
