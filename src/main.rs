@@ -1,5 +1,5 @@
 // Axel '0vercl0k' Souchet - July 6 2026
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(all(target_os = "windows", target_pointer_width = "64")))]
 compile_error!("This binary can only be built on windows");
 
 mod bindings;
@@ -32,7 +32,7 @@ const SPINNER: [&str; 4] = ["◐", "◓", "◑", "◒"];
 
 static VT_ON: LazyLock<bool> = LazyLock::new(|| turn_on_vt().is_ok());
 
-fn lockmem(p: &mut Process) -> Result<()> {
+fn lockmem(p: &Process) -> Result<()> {
     let (prefix, suffix) = if *VT_ON {
         // "\x1b[2K" is an ANSI escape sequence that clears the current line
         // w/o moving the cursor. "\r" is used to move the
@@ -75,8 +75,8 @@ fn lockmem(p: &mut Process) -> Result<()> {
         }
 
         debug!("Handling {range:#x?}");
+        p.grown_and_lock_mem(range.clone().into())?;
         amount += range.end - range.start;
-        p.grown_and_lock_mem(range.into())?;
 
         if last_update.elapsed().as_secs() >= 1 {
             let mut stdout = io::stdout();
@@ -118,7 +118,7 @@ fn open_and_lockmem(pid_or_name: &str) -> Result<()> {
 
     match p {
         None => Err("no process found".into()),
-        Some(mut p) => lockmem(&mut p),
+        Some(p) => lockmem(&p),
     }
 }
 
@@ -151,8 +151,10 @@ fn main() {
                         );
                     }
                 }
+            } else {
+                println!("got {e} while attemption to lockmem");
             }
         }
-        Err(e) => panic!("failed to open process: {e}"),
+        Err(e) => println!("failed to open process: {e}"),
     }
 }

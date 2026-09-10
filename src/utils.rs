@@ -58,12 +58,20 @@ pub(crate) fn turn_on_vt() -> Result<()> {
     let h = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
     let mut mode = 0;
     if !unsafe { GetConsoleMode(h, &raw mut mode) }.as_bool() {
-        return Err(windows_core::Error::from_thread().into());
+        return Err(format!(
+            "GetConsoleMode failed w/ {}",
+            windows_core::Error::from_thread()
+        )
+        .into());
     }
 
     mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
     if !unsafe { SetConsoleMode(h, mode) }.as_bool() {
-        return Err(windows_core::Error::from_thread().into());
+        return Err(format!(
+            "SetConsoleMode failed w/ {}",
+            windows_core::Error::from_thread()
+        )
+        .into());
     }
 
     Ok(())

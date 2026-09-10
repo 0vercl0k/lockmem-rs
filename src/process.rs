@@ -13,7 +13,8 @@ use crate::bindings::{
 use crate::bindings_sys::{
     CreateToolhelp32Snapshot, GetProcessWorkingSetSizeEx, HANDLE, MEMORY_BASIC_INFORMATION,
     OpenProcess, PROCESSENTRY32W, Process32FirstW, Process32NextW, STATUS_INCOMPATIBLE_FILE_MAP,
-    STATUS_SUCCESS, STATUS_WAS_LOCKED, SetProcessWorkingSetSizeEx, VirtualQueryEx,
+    STATUS_SUCCESS, STATUS_WAS_LOCKED, STATUS_WORKING_SET_QUOTA, SetProcessWorkingSetSizeEx,
+    VirtualQueryEx,
 };
 use crate::error::{Error, Result};
 use crate::handle::{Handle, ProcessHandle};
@@ -24,6 +25,8 @@ use crate::try_from_usize;
 unsafe extern "system" {
     pub fn NtLockVirtualMemory(
         ProcessHandle: HANDLE,
+        // SAFETY: This should be `usize` but because we explicitely only compile for 64-bit
+        // Windows target, this is fine.
         BaseAddress: *mut u64,
         RegionSize: *mut usize,
         MapType: u32,
@@ -55,11 +58,11 @@ impl Iterator for ProcessesIter {
         if self.first {
             self.first = false;
 
-            assert!(unsafe { Process32FirstW(*self.snapshot, &raw mut pe32) }.as_bool());
+            assert!(unsafe { Process32FirstW(self.snapshot.as_raw(), &raw mut pe32) }.as_bool());
 
             Some(pe32)
         } else {
-            match unsafe { Process32NextW(*self.snapshot, &raw mut pe32) }.ok() {
+            match unsafe { Process32NextW(self.snapshot.as_raw(), &raw mut pe32) }.ok() {
                 Err(_) => None,
                 _ => Some(pe32),
             }
@@ -95,7 +98,7 @@ impl Iterator for VirtMemIterator {
 
         if unsafe {
             VirtualQueryEx(
-                *self.handle,
+                self.handle.as_raw(),
                 Some(self.addr),
                 &raw mut mem_info,
                 size_of_val(&mem_info),
@@ -105,7 +108,8 @@ impl Iterator for VirtMemIterator {
             return None;
         }
 
-        self.addr = unsafe { mem_info.BaseAddress.byte_add(mem_info.RegionSize) }.cast();
+        assert_ne!(mem_info.RegionSize, 0);
+        self.addr = mem_info.BaseAddress.addr().strict_add(mem_info.RegionSize) as *const c_void;
 
         Some(mem_info)
     }
@@ -133,7 +137,7 @@ impl Process {
         let mut start = range.start;
         let status = unsafe {
             NtLockVirtualMemory(
-                *self.handle,
+                self.handle.as_raw(),
                 &raw mut start,
                 &raw mut range_len,
                 MAP_PROCESS,
@@ -157,14 +161,16 @@ impl Process {
             return Ok(range.end - range.start);
         }
 
-        debug!("NtLockVirtualMemory failed w/ {:#x}", status.0);
+        if status != STATUS_WORKING_SET_QUOTA {
+            return Err(format!("NtLockVirtualMemory failed w/ {status}").into());
+        }
 
         let mut minimum_ws_len = 0;
         let mut maximum_ws_len = 0;
         let mut flags = 0;
         unsafe {
             GetProcessWorkingSetSizeEx(
-                *self.handle,
+                self.handle.as_raw(),
                 &raw mut minimum_ws_len,
                 &raw mut maximum_ws_len,
                 &raw mut flags,
@@ -172,7 +178,6 @@ impl Process {
         }
         .ok()?;
 
-        let range_len = try_from_usize!(range.end - range.start);
         minimum_ws_len += range_len;
         maximum_ws_len += range_len;
 
@@ -183,8 +188,26 @@ impl Process {
 
         flags = QUOTA_LIMITS_HARDWS_MIN_ENABLE | QUOTA_LIMITS_HARDWS_MAX_DISABLE;
 
-        unsafe { SetProcessWorkingSetSizeEx(*self.handle, minimum_ws_len, maximum_ws_len, flags) }
-            .ok()?;
+        unsafe {
+            SetProcessWorkingSetSizeEx(self.handle.as_raw(), minimum_ws_len, maximum_ws_len, flags)
+        }
+        .ok()?;
+
+        let status = unsafe {
+            NtLockVirtualMemory(
+                self.handle.as_raw(),
+                &raw mut start,
+                &raw mut range_len,
+                MAP_PROCESS,
+            )
+        };
+
+        if status != STATUS_SUCCESS {
+            debug!("second attempt locking {range:#x?} failed w/ {status:#?}");
+            return Err(format!("failed to NtLockVirtualMemory {range:#x?} w/ {status}").into());
+        }
+
+        debug!("second attempt locking {range:#x?} worked!");
 
         Ok(range.end - range.start)
     }
@@ -208,7 +231,11 @@ impl Process {
 
         if handle.is_invalid() {
             debug!("failed to open pid {pid}");
-            return Err(windows_core::Error::from_thread().into());
+            return Err(format!(
+                "OpenProcess failed w/ {}",
+                windows_core::Error::from_thread()
+            )
+            .into());
         }
 
         let Some(h) = ProcessHandle::from_handle(handle) else {
@@ -226,8 +253,7 @@ impl Process {
                 .szExeFile
                 .iter()
                 .position(|&c| c == 0)
-                .expect("no NULL terminator in szExeFile")
-                .clamp(0, size_of_val(&pe32.szExeFile) - 1);
+                .expect("no NULL terminator in szExeFile");
             let pname = String::from_utf16_lossy(&pe32.szExeFile[..null_idx]);
 
             pname.eq_ignore_ascii_case(name)

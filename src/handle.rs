@@ -1,5 +1,4 @@
 // Axel '0vercl0k' Souchet - August 20 2023
-use std::ops::Deref;
 use std::path::PathBuf;
 
 use log::debug;
@@ -25,26 +24,12 @@ pub struct Handle {
 // regardless it is safe to send across threads.
 unsafe impl Send for Handle {}
 
-impl Deref for Handle {
-    type Target = HANDLE;
-
-    fn deref(&self) -> &Self::Target {
-        &self.handle
-    }
-}
-
 impl Default for Handle {
     fn default() -> Self {
         Self {
             handle: INVALID_HANDLE_VALUE,
             owned: false,
         }
-    }
-}
-
-impl From<HANDLE> for Handle {
-    fn from(value: HANDLE) -> Self {
-        Self::adopt(value)
     }
 }
 
@@ -82,7 +67,7 @@ impl Handle {
         unsafe {
             DuplicateHandle(
                 GetCurrentProcess(),
-                **handle,
+                handle.as_raw(),
                 GetCurrentProcess(),
                 &raw mut duplicated_handle,
                 0,
@@ -92,7 +77,11 @@ impl Handle {
         }
         .ok()?;
 
-        Ok(duplicated_handle.into())
+        Ok(Handle::adopt(duplicated_handle))
+    }
+
+    pub(crate) fn as_raw(&self) -> HANDLE {
+        self.handle
     }
 }
 
@@ -110,17 +99,13 @@ impl Drop for Handle {
 #[derive(Debug)]
 pub struct ProcessHandle(Handle);
 
-impl Deref for ProcessHandle {
-    type Target = HANDLE;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 impl ProcessHandle {
     fn new(handle: Handle) -> Self {
         Self(handle)
+    }
+
+    pub fn as_raw(&self) -> HANDLE {
+        self.0.as_raw()
     }
 
     pub fn duplicate(&self) -> Result<ProcessHandle> {
@@ -128,7 +113,7 @@ impl ProcessHandle {
     }
 
     pub fn pid(&self) -> u32 {
-        let ret = unsafe { GetProcessId(*self.0) };
+        let ret = unsafe { GetProcessId(self.as_raw()) };
         assert_ne!(ret, 0);
 
         ret
@@ -139,7 +124,7 @@ impl ProcessHandle {
         assert_eq!(
             unsafe {
                 NtQueryObject(
-                    Some(*handle),
+                    Some(handle.as_raw()),
                     ObjectTypeInformation,
                     None,
                     0,
@@ -153,7 +138,7 @@ impl ProcessHandle {
             AlignedAlloc::<PUBLIC_OBJECT_TYPE_INFORMATION>::new(try_from_usize!(needed_len));
         let status = unsafe {
             NtQueryObject(
-                Some(*handle),
+                Some(handle.as_raw()),
                 ObjectTypeInformation,
                 Some(info.as_mut_ptr().cast()),
                 needed_len,
@@ -166,7 +151,9 @@ impl ProcessHandle {
             return None;
         }
 
-        let Ok(typename) = (unsafe { (*info.as_ptr()).TypeName.Buffer.to_string() }) else {
+        let Ok(typename) =
+            String::from_utf16(unsafe { (*(info.as_ptr())).TypeName.Buffer.as_wide() })
+        else {
             return None;
         };
 
@@ -183,7 +170,7 @@ impl ProcessHandle {
 
         unsafe {
             QueryFullProcessImageNameW(
-                *self.0,
+                self.as_raw(),
                 0,
                 PWSTR::from_raw(buffer.as_mut_ptr()),
                 &raw mut buffer_len,
