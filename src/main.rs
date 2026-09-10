@@ -75,8 +75,8 @@ fn lockmem(p: &Process) -> Result<()> {
         }
 
         debug!("Handling {range:#x?}");
+        p.grown_and_lock_mem(range.clone().into())?;
         amount += range.end - range.start;
-        p.grown_and_lock_mem(range.into())?;
 
         if last_update.elapsed().as_secs() >= 1 {
             let mut stdout = io::stdout();
