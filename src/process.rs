@@ -25,6 +25,8 @@ use crate::try_from_usize;
 unsafe extern "system" {
     pub fn NtLockVirtualMemory(
         ProcessHandle: HANDLE,
+        // This should be `usize` but because we explicitely only compile for 64-bit Windows
+        // target, this is fine.
         BaseAddress: *mut u64,
         RegionSize: *mut usize,
         MapType: u32,
@@ -185,8 +187,10 @@ impl Process {
 
         flags = QUOTA_LIMITS_HARDWS_MIN_ENABLE | QUOTA_LIMITS_HARDWS_MAX_DISABLE;
 
-        unsafe { SetProcessWorkingSetSizeEx(self.handle.as_raw(), minimum_ws_len, maximum_ws_len, flags) }
-            .ok()?;
+        unsafe {
+            SetProcessWorkingSetSizeEx(self.handle.as_raw(), minimum_ws_len, maximum_ws_len, flags)
+        }
+        .ok()?;
 
         let status = unsafe {
             NtLockVirtualMemory(

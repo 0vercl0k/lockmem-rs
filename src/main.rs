@@ -1,5 +1,5 @@
 // Axel '0vercl0k' Souchet - July 6 2026
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(all(target_os = "windows", target_pointer_width = "64")))]
 compile_error!("This binary can only be built on windows");
 
 mod bindings;
