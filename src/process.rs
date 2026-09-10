@@ -253,8 +253,7 @@ impl Process {
                 .szExeFile
                 .iter()
                 .position(|&c| c == 0)
-                .expect("no NULL terminator in szExeFile")
-                .clamp(0, size_of_val(&pe32.szExeFile) - 1);
+                .expect("no NULL terminator in szExeFile");
             let pname = String::from_utf16_lossy(&pe32.szExeFile[..null_idx]);
 
             pname.eq_ignore_ascii_case(name)
