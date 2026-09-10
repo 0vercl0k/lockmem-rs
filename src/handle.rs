@@ -33,8 +33,7 @@ impl Default for Handle {
     }
 }
 
-impl Handle {
-}
+impl Handle {}
 
 impl Handle {
     /// Adopt a handle, and own it going forward.

@@ -32,7 +32,7 @@ const SPINNER: [&str; 4] = ["◐", "◓", "◑", "◒"];
 
 static VT_ON: LazyLock<bool> = LazyLock::new(|| turn_on_vt().is_ok());
 
-fn lockmem(p: &mut Process) -> Result<()> {
+fn lockmem(p: &Process) -> Result<()> {
     let (prefix, suffix) = if *VT_ON {
         // "\x1b[2K" is an ANSI escape sequence that clears the current line
         // w/o moving the cursor. "\r" is used to move the
@@ -118,7 +118,7 @@ fn open_and_lockmem(pid_or_name: &str) -> Result<()> {
 
     match p {
         None => Err("no process found".into()),
-        Some(mut p) => lockmem(&mut p),
+        Some(p) => lockmem(&p),
     }
 }
 
