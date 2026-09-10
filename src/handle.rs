@@ -166,7 +166,9 @@ impl ProcessHandle {
             return None;
         }
 
-        let Ok(typename) = (unsafe { (*info.as_ptr()).TypeName.Buffer.to_string() }) else {
+        let Ok(typename) =
+            String::from_utf16(unsafe { (*(info.as_ptr())).TypeName.Buffer.as_wide() })
+        else {
             return None;
         };
 
