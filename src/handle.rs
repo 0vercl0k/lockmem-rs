@@ -33,8 +33,6 @@ impl Default for Handle {
     }
 }
 
-impl Handle {}
-
 impl Handle {
     /// Adopt a handle, and own it going forward.
     pub fn adopt(handle: HANDLE) -> Self {
