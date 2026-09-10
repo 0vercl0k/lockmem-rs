@@ -108,7 +108,8 @@ impl Iterator for VirtMemIterator {
             return None;
         }
 
-        self.addr = unsafe { mem_info.BaseAddress.byte_add(mem_info.RegionSize) }.cast();
+        assert_ne!(mem_info.RegionSize, 0);
+        self.addr = mem_info.BaseAddress.addr().strict_add(mem_info.RegionSize) as *const c_void;
 
         Some(mem_info)
     }
