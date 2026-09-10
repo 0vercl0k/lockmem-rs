@@ -186,8 +186,7 @@ impl PrivilegeManager {
             }
 
             let name = CString::from_vec_with_nul(name)?;
-            let enabled = (luid.Attributes & SE_PRIVILEGE_ENABLED_BY_DEFAULT) != 0
-                || (luid.Attributes & SE_PRIVILEGE_ENABLED) != 0;
+            let enabled = (luid.Attributes & SE_PRIVILEGE_ENABLED) != 0;
             privileges.insert(name, enabled);
         }
 
