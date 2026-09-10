@@ -151,8 +151,10 @@ fn main() {
                         );
                     }
                 }
+            } else {
+                println!("got {e} while attemption to lockmem");
             }
         }
-        Err(e) => panic!("failed to open process: {e}"),
+        Err(e) => println!("failed to open process: {e}"),
     }
 }

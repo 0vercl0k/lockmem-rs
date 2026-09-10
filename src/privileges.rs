@@ -122,8 +122,10 @@ impl PrivilegeManager {
         let token = Handle::adopt(token);
         let mut needed = 0;
         assert!(
-            !unsafe { GetTokenInformation(token.as_raw(), TokenPrivileges, None, 0, &raw mut needed) }
-                .as_bool()
+            !unsafe {
+                GetTokenInformation(token.as_raw(), TokenPrivileges, None, 0, &raw mut needed)
+            }
+            .as_bool()
         );
 
         let mut info = AlignedAlloc::<TOKEN_PRIVILEGES>::new(try_from_usize!(needed));
