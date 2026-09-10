@@ -343,7 +343,6 @@ impl Default for PUBLIC_OBJECT_TYPE_INFORMATION {
 pub const QUOTA_LIMITS_HARDWS_MAX_DISABLE: i32 = 8;
 pub const QUOTA_LIMITS_HARDWS_MIN_ENABLE: i32 = 1;
 pub const SE_PRIVILEGE_ENABLED: i32 = 2;
-pub const SE_PRIVILEGE_ENABLED_BY_DEFAULT: i32 = 1;
 pub const STATUS_INCOMPATIBLE_FILE_MAP: windows_core::NTSTATUS =
     windows_core::NTSTATUS(0xC000004D_u32 as _);
 pub const STATUS_INFO_LENGTH_MISMATCH: windows_core::NTSTATUS =
@@ -376,3 +375,4 @@ pub struct UNICODE_STRING {
     pub MaximumLength: u16,
     pub Buffer: windows_core::PWSTR,
 }
+

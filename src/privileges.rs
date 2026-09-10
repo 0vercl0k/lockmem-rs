@@ -7,8 +7,7 @@ use std::sync::{LazyLock, Mutex};
 use windows_core::{PCSTR, PSTR};
 
 use crate::bindings::{
-    ERROR_NOT_ALL_ASSIGNED, SE_PRIVILEGE_ENABLED, SE_PRIVILEGE_ENABLED_BY_DEFAULT,
-    TOKEN_ADJUST_PRIVILEGES, TOKEN_QUERY,
+    ERROR_NOT_ALL_ASSIGNED, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_QUERY,
 };
 use crate::bindings_sys::{
     AdjustTokenPrivileges, GetCurrentProcess, GetLastError, GetTokenInformation, HANDLE, LUID,
