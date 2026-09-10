@@ -375,3 +375,4 @@ pub struct UNICODE_STRING {
     pub MaximumLength: u16,
     pub Buffer: windows_core::PWSTR,
 }
+
