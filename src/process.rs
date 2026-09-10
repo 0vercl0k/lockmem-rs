@@ -56,11 +56,11 @@ impl Iterator for ProcessesIter {
         if self.first {
             self.first = false;
 
-            assert!(unsafe { Process32FirstW(*self.snapshot, &raw mut pe32) }.as_bool());
+            assert!(unsafe { Process32FirstW(self.snapshot.as_raw(), &raw mut pe32) }.as_bool());
 
             Some(pe32)
         } else {
-            match unsafe { Process32NextW(*self.snapshot, &raw mut pe32) }.ok() {
+            match unsafe { Process32NextW(self.snapshot.as_raw(), &raw mut pe32) }.ok() {
                 Err(_) => None,
                 _ => Some(pe32),
             }
@@ -96,7 +96,7 @@ impl Iterator for VirtMemIterator {
 
         if unsafe {
             VirtualQueryEx(
-                *self.handle,
+                self.handle.as_raw(),
                 Some(self.addr),
                 &raw mut mem_info,
                 size_of_val(&mem_info),
@@ -134,7 +134,7 @@ impl Process {
         let mut start = range.start;
         let status = unsafe {
             NtLockVirtualMemory(
-                *self.handle,
+                self.handle.as_raw(),
                 &raw mut start,
                 &raw mut range_len,
                 MAP_PROCESS,
@@ -167,7 +167,7 @@ impl Process {
         let mut flags = 0;
         unsafe {
             GetProcessWorkingSetSizeEx(
-                *self.handle,
+                self.handle.as_raw(),
                 &raw mut minimum_ws_len,
                 &raw mut maximum_ws_len,
                 &raw mut flags,
@@ -185,12 +185,12 @@ impl Process {
 
         flags = QUOTA_LIMITS_HARDWS_MIN_ENABLE | QUOTA_LIMITS_HARDWS_MAX_DISABLE;
 
-        unsafe { SetProcessWorkingSetSizeEx(*self.handle, minimum_ws_len, maximum_ws_len, flags) }
+        unsafe { SetProcessWorkingSetSizeEx(self.handle.as_raw(), minimum_ws_len, maximum_ws_len, flags) }
             .ok()?;
 
         let status = unsafe {
             NtLockVirtualMemory(
-                *self.handle,
+                self.handle.as_raw(),
                 &raw mut start,
                 &raw mut range_len,
                 MAP_PROCESS,
