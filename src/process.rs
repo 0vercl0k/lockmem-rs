@@ -48,9 +48,7 @@ static SYSTEM_INFO: LazyLock<SystemInfo> = LazyLock::new(|| {
 unsafe extern "system" {
     pub fn NtLockVirtualMemory(
         ProcessHandle: HANDLE,
-        // SAFETY: This should be `usize` but because we explicitely only compile for 64-bit
-        // Windows target, this is fine.
-        BaseAddress: *mut u64,
+        BaseAddress: *mut usize,
         RegionSize: *mut usize,
         MapType: u32,
     ) -> NTSTATUS;
@@ -182,7 +180,7 @@ impl Process {
     pub fn grown_and_lock_mem(&self, range: Range<u64>) -> Result<u64> {
         const MAP_PROCESS: u32 = 1;
         let mut range_len = try_from_usize!(range.end - range.start);
-        let mut start = range.start;
+        let mut start = try_from_usize!(range.start);
         let status = unsafe {
             NtLockVirtualMemory(
                 self.handle.as_raw(),
