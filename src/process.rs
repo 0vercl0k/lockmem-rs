@@ -21,19 +21,27 @@ use crate::handle::{Handle, ProcessHandle};
 use crate::human::ToHuman;
 use crate::try_from_usize;
 
-// SAFETY: There's no issue w/ that type being sent to another thread or
-// accessed from multiple threads; it is just a structure that stores a bunch of
-// special values that we need later on.
-unsafe impl Sync for SYSTEM_INFO {}
-unsafe impl Send for SYSTEM_INFO {}
+#[derive(Debug)]
+struct SystemInfo {
+    minimum_app_addr: *const c_void,
+    maximum_app_addr: *const c_void,
+}
 
-static SYSTEM_INFO: LazyLock<SYSTEM_INFO> = LazyLock::new(|| {
+// SAFETY: The structure is made of pointers, but they're actually just plain
+// addresses; none of them point to any kind of resources.
+unsafe impl Sync for SystemInfo {}
+unsafe impl Send for SystemInfo {}
+
+static SYSTEM_INFO: LazyLock<SystemInfo> = LazyLock::new(|| {
     let mut s = SYSTEM_INFO::default();
     unsafe {
         GetSystemInfo(&raw mut s);
     }
 
-    s
+    SystemInfo {
+        minimum_app_addr: s.lpMinimumApplicationAddress,
+        maximum_app_addr: s.lpMaximumApplicationAddress,
+    }
 });
 
 #[link(name = "ntdll")]
@@ -116,7 +124,7 @@ pub struct VirtMemIterator {
 
 impl VirtMemIterator {
     pub fn new(handle: ProcessHandle) -> Self {
-        let addr = SYSTEM_INFO.lpMinimumApplicationAddress;
+        let addr = SYSTEM_INFO.minimum_app_addr;
 
         Self { handle, addr }
     }
@@ -128,7 +136,7 @@ impl Iterator for VirtMemIterator {
     fn next(&mut self) -> Option<Self::Item> {
         let mut mem_info = MEMORY_BASIC_INFORMATION::default();
 
-        if self.addr >= SYSTEM_INFO.lpMaximumApplicationAddress {
+        if self.addr >= SYSTEM_INFO.maximum_app_addr {
             return None;
         }
 
