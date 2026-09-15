@@ -254,6 +254,7 @@ pub unsafe fn VirtualQueryEx(
 pub const DUPLICATE_SAME_ACCESS: i32 = 2;
 pub const ENABLE_VIRTUAL_TERMINAL_PROCESSING: i32 = 4;
 pub const ERROR_NOT_ALL_ASSIGNED: i32 = 1300;
+pub const ERROR_NO_MORE_FILES: i32 = 18;
 pub const E_ACCESSDENIED: windows_core::HRESULT = windows_core::HRESULT(0x80070005_u32 as _);
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

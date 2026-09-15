@@ -4,10 +4,10 @@ use std::ptr::null;
 use std::range::Range;
 
 use log::debug;
-use windows_core::NTSTATUS;
+use windows_core::{NTSTATUS, WIN32_ERROR};
 
 use crate::bindings::{
-    PROCESS_QUERY_INFORMATION, PROCESS_SET_QUOTA, PROCESS_VM_OPERATION,
+    ERROR_NO_MORE_FILES, PROCESS_QUERY_INFORMATION, PROCESS_SET_QUOTA, PROCESS_VM_OPERATION,
     QUOTA_LIMITS_HARDWS_MAX_DISABLE, QUOTA_LIMITS_HARDWS_MIN_ENABLE, TH32CS_SNAPPROCESS,
 };
 use crate::bindings_sys::{
@@ -41,15 +41,14 @@ pub struct ProcessesIter {
 
 impl ProcessesIter {
     fn new(snapshot: Handle) -> Self {
-        Self {
-            snapshot,
-            first: true,
-        }
+        let first = true;
+
+        Self { snapshot, first }
     }
 }
 
 impl Iterator for ProcessesIter {
-    type Item = PROCESSENTRY32W;
+    type Item = Result<PROCESSENTRY32W>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut pe32 = PROCESSENTRY32W::default();
@@ -57,14 +56,29 @@ impl Iterator for ProcessesIter {
 
         if self.first {
             self.first = false;
+            if !unsafe { Process32FirstW(self.snapshot.as_raw(), &raw mut pe32) }.as_bool() {
+                return Some(Err(format!(
+                    "Process32FirstW failed w/ {}",
+                    windows_core::Error::from_thread()
+                )
+                .into()));
+            }
 
-            assert!(unsafe { Process32FirstW(self.snapshot.as_raw(), &raw mut pe32) }.as_bool());
-
-            Some(pe32)
+            Some(Ok(pe32))
         } else {
-            match unsafe { Process32NextW(self.snapshot.as_raw(), &raw mut pe32) }.ok() {
-                Err(_) => None,
-                _ => Some(pe32),
+            let success =
+                unsafe { Process32NextW(self.snapshot.as_raw(), &raw mut pe32) }.as_bool();
+
+            if success {
+                Some(Ok(pe32))
+            } else if WIN32_ERROR::from_thread().0 != ERROR_NO_MORE_FILES {
+                Some(Err(format!(
+                    "Process32NextW failed w/ {}",
+                    windows_core::Error::from_thread()
+                )
+                .into()))
+            } else {
+                None
             }
         }
     }
@@ -248,7 +262,8 @@ impl Process {
 
     /// Find a process by its name.
     pub fn from_name(name: &str) -> Result<Option<Self>> {
-        let Some(pe32) = Processes::iter()?.find(|pe32| {
+        for pe32 in Processes::iter()? {
+            let pe32 = pe32?;
             let null_idx = pe32
                 .szExeFile
                 .iter()
@@ -256,13 +271,14 @@ impl Process {
                 .expect("no NULL terminator in szExeFile");
             let pname = String::from_utf16_lossy(&pe32.szExeFile[..null_idx]);
 
-            pname.eq_ignore_ascii_case(name)
-        }) else {
-            debug!("failed to find process '{name}'");
-            return Ok(None);
-        };
+            if pname.eq_ignore_ascii_case(name) {
+                return Self::from_pid(pe32.th32ModuleID);
+            }
+        }
 
-        Self::from_pid(pe32.th32ProcessID)
+        debug!("failed to find process '{name}'");
+
+        Ok(None)
     }
 
     pub fn pid(&self) -> u32 {
