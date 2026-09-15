@@ -65,21 +65,16 @@ impl Iterator for ProcessesIter {
             }
 
             Some(Ok(pe32))
+        } else if unsafe { Process32NextW(self.snapshot.as_raw(), &raw mut pe32) }.as_bool() {
+            Some(Ok(pe32))
+        } else if WIN32_ERROR::from_thread().0 != ERROR_NO_MORE_FILES {
+            Some(Err(format!(
+                "Process32NextW failed w/ {}",
+                windows_core::Error::from_thread()
+            )
+            .into()))
         } else {
-            let success =
-                unsafe { Process32NextW(self.snapshot.as_raw(), &raw mut pe32) }.as_bool();
-
-            if success {
-                Some(Ok(pe32))
-            } else if WIN32_ERROR::from_thread().0 != ERROR_NO_MORE_FILES {
-                Some(Err(format!(
-                    "Process32NextW failed w/ {}",
-                    windows_core::Error::from_thread()
-                )
-                .into()))
-            } else {
-                None
-            }
+            None
         }
     }
 }
@@ -272,7 +267,7 @@ impl Process {
             let pname = String::from_utf16_lossy(&pe32.szExeFile[..null_idx]);
 
             if pname.eq_ignore_ascii_case(name) {
-                return Self::from_pid(pe32.th32ModuleID);
+                return Self::from_pid(pe32.th32ProcessID);
             }
         }
 
