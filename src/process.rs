@@ -21,6 +21,9 @@ use crate::handle::{Handle, ProcessHandle};
 use crate::human::ToHuman;
 use crate::try_from_usize;
 
+// SAFETY: There's no issue w/ that type being sent to another thread or
+// accessed from multiple threads; it is just a structure that stores a bunch of
+// special values that we need later on.
 unsafe impl Sync for SYSTEM_INFO {}
 unsafe impl Send for SYSTEM_INFO {}
 
