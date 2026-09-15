@@ -14,6 +14,7 @@ GetLastError
 GetProcessId
 GetProcessWorkingSetSizeEx
 GetStdHandle
+GetSystemInfo
 GetTokenInformation
 HANDLE
 INVALID_HANDLE_VALUE
@@ -46,6 +47,7 @@ STATUS_SUCCESS
 STATUS_WAS_LOCKED
 STATUS_WORKING_SET_QUOTA
 STD_OUTPUT_HANDLE
+SYSTEM_INFO
 SetConsoleMode
 SetProcessWorkingSetSizeEx
 TH32CS_SNAPPROCESS

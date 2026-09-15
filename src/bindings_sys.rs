@@ -102,6 +102,11 @@ pub unsafe fn GetStdHandle(nstdhandle: u32) -> HANDLE {
     unsafe { GetStdHandle(nstdhandle) }
 }
 #[inline]
+pub unsafe fn GetSystemInfo(lpsysteminfo: *mut SYSTEM_INFO) {
+    windows_core::link!("kernel32.dll" "system" fn GetSystemInfo(lpsysteminfo : *mut SYSTEM_INFO));
+    unsafe { GetSystemInfo(lpsysteminfo as _) }
+}
+#[inline]
 pub unsafe fn GetTokenInformation(
     tokenhandle: HANDLE,
     tokeninformationclass: TOKEN_INFORMATION_CLASS,
@@ -353,6 +358,42 @@ pub const STATUS_WAS_LOCKED: windows_core::NTSTATUS = windows_core::NTSTATUS(0x4
 pub const STATUS_WORKING_SET_QUOTA: windows_core::NTSTATUS =
     windows_core::NTSTATUS(0xC00000A1_u32 as _);
 pub const STD_OUTPUT_HANDLE: u32 = 4294967285;
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SYSTEM_INFO {
+    pub Anonymous: SYSTEM_INFO_0,
+    pub dwPageSize: u32,
+    pub lpMinimumApplicationAddress: *mut core::ffi::c_void,
+    pub lpMaximumApplicationAddress: *mut core::ffi::c_void,
+    pub dwActiveProcessorMask: usize,
+    pub dwNumberOfProcessors: u32,
+    pub dwProcessorType: u32,
+    pub dwAllocationGranularity: u32,
+    pub wProcessorLevel: u16,
+    pub wProcessorRevision: u16,
+}
+impl Default for SYSTEM_INFO {
+    fn default() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union SYSTEM_INFO_0 {
+    pub dwOemId: u32,
+    pub Anonymous: SYSTEM_INFO_0_0,
+}
+impl Default for SYSTEM_INFO_0 {
+    fn default() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SYSTEM_INFO_0_0 {
+    pub wProcessorArchitecture: u16,
+    pub wReserved: u16,
+}
 pub const TH32CS_SNAPPROCESS: i32 = 2;
 pub const TOKEN_ADJUST_PRIVILEGES: i32 = 32;
 pub type TOKEN_INFORMATION_CLASS = i32;
@@ -376,3 +417,4 @@ pub struct UNICODE_STRING {
     pub MaximumLength: u16,
     pub Buffer: windows_core::PWSTR,
 }
+

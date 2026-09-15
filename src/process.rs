@@ -1,7 +1,7 @@
 // Axel '0vercl0k' Souchet - December 6th 2024
 use std::ffi::c_void;
-use std::ptr::null;
 use std::range::Range;
+use std::sync::LazyLock;
 
 use log::debug;
 use windows_core::{NTSTATUS, WIN32_ERROR};
@@ -11,15 +11,27 @@ use crate::bindings::{
     QUOTA_LIMITS_HARDWS_MAX_DISABLE, QUOTA_LIMITS_HARDWS_MIN_ENABLE, TH32CS_SNAPPROCESS,
 };
 use crate::bindings_sys::{
-    CreateToolhelp32Snapshot, GetProcessWorkingSetSizeEx, HANDLE, MEMORY_BASIC_INFORMATION,
-    OpenProcess, PROCESSENTRY32W, Process32FirstW, Process32NextW, STATUS_INCOMPATIBLE_FILE_MAP,
-    STATUS_SUCCESS, STATUS_WAS_LOCKED, STATUS_WORKING_SET_QUOTA, SetProcessWorkingSetSizeEx,
-    VirtualQueryEx,
+    CreateToolhelp32Snapshot, GetProcessWorkingSetSizeEx, GetSystemInfo, HANDLE,
+    MEMORY_BASIC_INFORMATION, OpenProcess, PROCESSENTRY32W, Process32FirstW, Process32NextW,
+    STATUS_INCOMPATIBLE_FILE_MAP, STATUS_SUCCESS, STATUS_WAS_LOCKED, STATUS_WORKING_SET_QUOTA,
+    SYSTEM_INFO, SetProcessWorkingSetSizeEx, VirtualQueryEx,
 };
 use crate::error::{Error, Result};
 use crate::handle::{Handle, ProcessHandle};
 use crate::human::ToHuman;
 use crate::try_from_usize;
+
+unsafe impl Sync for SYSTEM_INFO {}
+unsafe impl Send for SYSTEM_INFO {}
+
+static SYSTEM_INFO: LazyLock<SYSTEM_INFO> = LazyLock::new(|| {
+    let mut s = SYSTEM_INFO::default();
+    unsafe {
+        GetSystemInfo(&raw mut s);
+    }
+
+    s
+});
 
 #[link(name = "ntdll")]
 unsafe extern "system" {
@@ -99,11 +111,23 @@ pub struct VirtMemIterator {
     addr: *const c_void,
 }
 
+impl VirtMemIterator {
+    pub fn new(handle: ProcessHandle) -> Self {
+        let addr = SYSTEM_INFO.lpMinimumApplicationAddress;
+
+        Self { handle, addr }
+    }
+}
+
 impl Iterator for VirtMemIterator {
-    type Item = MEMORY_BASIC_INFORMATION;
+    type Item = Result<MEMORY_BASIC_INFORMATION>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut mem_info = MEMORY_BASIC_INFORMATION::default();
+
+        if self.addr >= SYSTEM_INFO.lpMaximumApplicationAddress {
+            return None;
+        }
 
         if unsafe {
             VirtualQueryEx(
@@ -114,13 +138,17 @@ impl Iterator for VirtMemIterator {
             )
         } == 0
         {
-            return None;
+            return Some(Err(format!(
+                "VirtualQueryEx failed w/ {}",
+                windows_core::Error::from_thread()
+            )
+            .into()));
         }
 
         assert_ne!(mem_info.RegionSize, 0);
         self.addr = mem_info.BaseAddress.addr().strict_add(mem_info.RegionSize) as *const c_void;
 
-        Some(mem_info)
+        Some(Ok(mem_info))
     }
 }
 
@@ -222,10 +250,7 @@ impl Process {
     }
 
     pub fn iter_mem(&self) -> Result<VirtMemIterator> {
-        Ok(VirtMemIterator {
-            handle: self.handle.duplicate()?,
-            addr: null(),
-        })
+        Ok(VirtMemIterator::new(self.handle.duplicate()?))
     }
 
     /// Create a [`Process`] a process from a pid.
