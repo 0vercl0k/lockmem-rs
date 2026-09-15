@@ -153,7 +153,7 @@ fn main() {
                     }
                 }
             } else {
-                println!("got {e} while attemption to lockmem");
+                println!("got {e} while attempting to lockmem");
             }
         }
         Err(e) => println!("failed to open process: {e}"),
