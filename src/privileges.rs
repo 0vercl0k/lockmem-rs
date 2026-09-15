@@ -7,8 +7,7 @@ use std::sync::{LazyLock, Mutex};
 use windows_core::{PCSTR, PSTR};
 
 use crate::bindings::{
-    ERROR_NOT_ALL_ASSIGNED, SE_PRIVILEGE_ENABLED, SE_PRIVILEGE_ENABLED_BY_DEFAULT,
-    TOKEN_ADJUST_PRIVILEGES, TOKEN_QUERY,
+    ERROR_NOT_ALL_ASSIGNED, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_QUERY,
 };
 use crate::bindings_sys::{
     AdjustTokenPrivileges, GetCurrentProcess, GetLastError, GetTokenInformation, HANDLE, LUID,
@@ -106,7 +105,7 @@ impl PrivilegeManager {
         let mut token = HANDLE::default();
         if !unsafe {
             OpenProcessToken(
-                *process,
+                process.as_raw(),
                 TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
                 &raw mut token,
             )
@@ -123,15 +122,17 @@ impl PrivilegeManager {
         let token = Handle::adopt(token);
         let mut needed = 0;
         assert!(
-            !unsafe { GetTokenInformation(*token, TokenPrivileges, None, 0, &raw mut needed) }
-                .as_bool()
+            !unsafe {
+                GetTokenInformation(token.as_raw(), TokenPrivileges, None, 0, &raw mut needed)
+            }
+            .as_bool()
         );
 
         let mut info = AlignedAlloc::<TOKEN_PRIVILEGES>::new(try_from_usize!(needed));
         let mut written = 0;
         if !unsafe {
             GetTokenInformation(
-                *token,
+                token.as_raw(),
                 TokenPrivileges,
                 Some(info.as_mut_ptr().cast()),
                 needed,
@@ -186,8 +187,7 @@ impl PrivilegeManager {
             }
 
             let name = CString::from_vec_with_nul(name)?;
-            let enabled = (luid.Attributes & SE_PRIVILEGE_ENABLED_BY_DEFAULT) != 0
-                || (luid.Attributes & SE_PRIVILEGE_ENABLED) != 0;
+            let enabled = (luid.Attributes & SE_PRIVILEGE_ENABLED) != 0;
             privileges.insert(name, enabled);
         }
 
@@ -206,7 +206,7 @@ impl PrivilegeManager {
 
         if !unsafe {
             AdjustTokenPrivileges(
-                *self.token,
+                self.token.as_raw(),
                 false,
                 Some(&raw const privs),
                 try_from!(u32, size_of_val(&privs)),

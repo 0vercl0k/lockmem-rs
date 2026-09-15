@@ -1,6 +1,6 @@
 [package]
 name = "lockmem-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 categories = ["command-line-utilities", "development-tools::debugging"]
 description = "Lock virtual memory regions of an arbitrary process into its working set."

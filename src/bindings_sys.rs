@@ -102,6 +102,11 @@ pub unsafe fn GetStdHandle(nstdhandle: u32) -> HANDLE {
     unsafe { GetStdHandle(nstdhandle) }
 }
 #[inline]
+pub unsafe fn GetSystemInfo(lpsysteminfo: *mut SYSTEM_INFO) {
+    windows_core::link!("kernel32.dll" "system" fn GetSystemInfo(lpsysteminfo : *mut SYSTEM_INFO));
+    unsafe { GetSystemInfo(lpsysteminfo as _) }
+}
+#[inline]
 pub unsafe fn GetTokenInformation(
     tokenhandle: HANDLE,
     tokeninformationclass: TOKEN_INFORMATION_CLASS,
@@ -254,6 +259,7 @@ pub unsafe fn VirtualQueryEx(
 pub const DUPLICATE_SAME_ACCESS: i32 = 2;
 pub const ENABLE_VIRTUAL_TERMINAL_PROCESSING: i32 = 4;
 pub const ERROR_NOT_ALL_ASSIGNED: i32 = 1300;
+pub const ERROR_NO_MORE_FILES: i32 = 18;
 pub const E_ACCESSDENIED: windows_core::HRESULT = windows_core::HRESULT(0x80070005_u32 as _);
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -343,14 +349,51 @@ impl Default for PUBLIC_OBJECT_TYPE_INFORMATION {
 pub const QUOTA_LIMITS_HARDWS_MAX_DISABLE: i32 = 8;
 pub const QUOTA_LIMITS_HARDWS_MIN_ENABLE: i32 = 1;
 pub const SE_PRIVILEGE_ENABLED: i32 = 2;
-pub const SE_PRIVILEGE_ENABLED_BY_DEFAULT: i32 = 1;
 pub const STATUS_INCOMPATIBLE_FILE_MAP: windows_core::NTSTATUS =
     windows_core::NTSTATUS(0xC000004D_u32 as _);
 pub const STATUS_INFO_LENGTH_MISMATCH: windows_core::NTSTATUS =
     windows_core::NTSTATUS(0xC0000004_u32 as _);
 pub const STATUS_SUCCESS: windows_core::NTSTATUS = windows_core::NTSTATUS(0x0_u32 as _);
 pub const STATUS_WAS_LOCKED: windows_core::NTSTATUS = windows_core::NTSTATUS(0x40000019_u32 as _);
+pub const STATUS_WORKING_SET_QUOTA: windows_core::NTSTATUS =
+    windows_core::NTSTATUS(0xC00000A1_u32 as _);
 pub const STD_OUTPUT_HANDLE: u32 = 4294967285;
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SYSTEM_INFO {
+    pub Anonymous: SYSTEM_INFO_0,
+    pub dwPageSize: u32,
+    pub lpMinimumApplicationAddress: *mut core::ffi::c_void,
+    pub lpMaximumApplicationAddress: *mut core::ffi::c_void,
+    pub dwActiveProcessorMask: usize,
+    pub dwNumberOfProcessors: u32,
+    pub dwProcessorType: u32,
+    pub dwAllocationGranularity: u32,
+    pub wProcessorLevel: u16,
+    pub wProcessorRevision: u16,
+}
+impl Default for SYSTEM_INFO {
+    fn default() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union SYSTEM_INFO_0 {
+    pub dwOemId: u32,
+    pub Anonymous: SYSTEM_INFO_0_0,
+}
+impl Default for SYSTEM_INFO_0 {
+    fn default() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct SYSTEM_INFO_0_0 {
+    pub wProcessorArchitecture: u16,
+    pub wReserved: u16,
+}
 pub const TH32CS_SNAPPROCESS: i32 = 2;
 pub const TOKEN_ADJUST_PRIVILEGES: i32 = 32;
 pub type TOKEN_INFORMATION_CLASS = i32;
