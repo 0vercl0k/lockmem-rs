@@ -275,12 +275,9 @@ impl Process {
         });
 
         if handle.is_invalid() {
+            let e = windows_core::Error::from_thread();
             debug!("failed to open pid {pid}");
-            return Err(format!(
-                "OpenProcess failed w/ {}",
-                windows_core::Error::from_thread()
-            )
-            .into());
+            return Err(format!("OpenProcess failed w/ {e}",).into());
         }
 
         let Some(h) = ProcessHandle::from_handle(handle) else {
