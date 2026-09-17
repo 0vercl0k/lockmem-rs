@@ -78,22 +78,22 @@ impl Iterator for ProcessesIter {
         if self.first {
             self.first = false;
             if !unsafe { Process32FirstW(self.snapshot.as_raw(), &raw mut pe32) }.as_bool() {
-                return Some(Err(format!(
-                    "Process32FirstW failed w/ {}",
-                    windows_core::Error::from_thread()
-                )
-                .into()));
+                let e = windows_core::Error::from_thread();
+                return Some(Err(Error::win32(
+                    format!("Process32FirstW(snap={})", self.snapshot),
+                    e,
+                )));
             }
 
             Some(Ok(pe32))
         } else if unsafe { Process32NextW(self.snapshot.as_raw(), &raw mut pe32) }.as_bool() {
             Some(Ok(pe32))
         } else if WIN32_ERROR::from_thread().0 != ERROR_NO_MORE_FILES {
-            Some(Err(format!(
-                "Process32NextW failed w/ {}",
-                windows_core::Error::from_thread()
-            )
-            .into()))
+            let e = windows_core::Error::from_thread();
+            Some(Err(Error::win32(
+                format!("Process32NextW(snap={})", self.snapshot),
+                e,
+            )))
         } else {
             None
         }
@@ -107,7 +107,8 @@ impl Processes {
     pub fn iter() -> Result<ProcessesIter> {
         let h = Handle::adopt(unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) });
         if h.is_invalid() {
-            return Err(Error::Win32(windows_core::Error::from_thread()));
+            let e = windows_core::Error::from_thread();
+            return Err(Error::win32("CreateToolhelp32Snapshot", e));
         }
 
         Ok(ProcessesIter::new(h))
@@ -147,11 +148,11 @@ impl Iterator for VirtMemIterator {
             )
         } == 0
         {
-            return Some(Err(format!(
-                "VirtualQueryEx failed w/ {}",
-                windows_core::Error::from_thread()
-            )
-            .into()));
+            let e = windows_core::Error::from_thread();
+            return Some(Err(Error::win32(
+                format!("VirtualQueryEx(addr={:#x})", self.addr.addr()),
+                e,
+            )));
         }
 
         assert_ne!(mem_info.RegionSize, 0);
@@ -208,7 +209,8 @@ impl Process {
         }
 
         if status != STATUS_WORKING_SET_QUOTA {
-            return Err(format!("NtLockVirtualMemory failed w/ {status}").into());
+            let e = status.to_hresult().into();
+            return Err(Error::win32(format!("NtLockVirtualMemory {start:#x}"), e));
         }
 
         let mut minimum_ws_len = 0;
@@ -222,7 +224,16 @@ impl Process {
                 &raw mut flags,
             )
         }
-        .ok()?;
+        .ok()
+        .map_err(|e| {
+            Error::win32(
+                format!(
+                    "GetProcessWorkingSetSizeEx(h={}, min={minimum_ws_len}, max={maximum_ws_len})",
+                    self.handle
+                ),
+                e,
+            )
+        })?;
 
         minimum_ws_len += range_len;
         maximum_ws_len += range_len;
@@ -237,7 +248,16 @@ impl Process {
         unsafe {
             SetProcessWorkingSetSizeEx(self.handle.as_raw(), minimum_ws_len, maximum_ws_len, flags)
         }
-        .ok()?;
+        .ok()
+        .map_err(|e| {
+            Error::win32(
+                format!(
+                    "SetProcessWorkingSetSizeEx(h={}, min={minimum_ws_len}, max={maximum_ws_len}",
+                    self.handle
+                ),
+                e,
+            )
+        })?;
 
         let status = unsafe {
             NtLockVirtualMemory(
@@ -275,7 +295,7 @@ impl Process {
         if handle.is_invalid() {
             let e = windows_core::Error::from_thread();
             debug!("failed to open pid {pid}");
-            return Err(format!("OpenProcess failed w/ {e}",).into());
+            return Err(Error::win32(format!("OpenProcess(pid={pid})"), e));
         }
 
         let Some(h) = ProcessHandle::from_handle(handle) else {

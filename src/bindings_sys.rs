@@ -70,11 +70,6 @@ pub unsafe fn GetCurrentProcess() -> HANDLE {
     unsafe { GetCurrentProcess() }
 }
 #[inline]
-pub unsafe fn GetLastError() -> u32 {
-    windows_core::link!("kernel32.dll" "system" fn GetLastError() -> u32);
-    unsafe { GetLastError() }
-}
-#[inline]
 pub unsafe fn GetProcessId(process: HANDLE) -> u32 {
     windows_core::link!("kernel32.dll" "system" fn GetProcessId(process : HANDLE) -> u32);
     unsafe { GetProcessId(process) }

@@ -10,11 +10,12 @@ use crate::bindings::{
     ERROR_NOT_ALL_ASSIGNED, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_QUERY,
 };
 use crate::bindings_sys::{
-    AdjustTokenPrivileges, GetCurrentProcess, GetLastError, GetTokenInformation, HANDLE, LUID,
+    AdjustTokenPrivileges, GetCurrentProcess, GetTokenInformation, HANDLE, LUID,
     LookupPrivilegeNameA, LookupPrivilegeValueA, OpenProcessToken, TOKEN_PRIVILEGES,
     TokenPrivileges,
 };
-use crate::handle::Handle;
+use crate::error::Error;
+use crate::handle::{Handle, ProcessHandle};
 use crate::utils::AlignedAlloc;
 use crate::{Result, try_from, try_from_usize};
 
@@ -101,36 +102,28 @@ pub(crate) struct PrivilegeManager {
 impl PrivilegeManager {
     fn current() -> Result<Self> {
         const MAX_PRIVILEGE_NAME_LEN: usize = 64;
-        let process = Handle::wrap(unsafe { GetCurrentProcess() });
+        let process =
+            ProcessHandle::from_handle(Handle::wrap(unsafe { GetCurrentProcess() })).unwrap();
         let mut token = HANDLE::default();
-        if !unsafe {
+        unsafe {
             OpenProcessToken(
                 process.as_raw(),
                 TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
                 &raw mut token,
             )
         }
-        .as_bool()
-        {
-            return Err(format!(
-                "OpenProcessToken failed w/ {}",
-                windows_core::Error::from_thread()
-            )
-            .into());
-        }
+        .ok()
+        .map_err(|e| Error::win32(format!("OpenProcessToken(p={process})"), e))?;
 
         let token = Handle::adopt(token);
         let mut needed = 0;
-        assert!(
-            !unsafe {
-                GetTokenInformation(token.as_raw(), TokenPrivileges, None, 0, &raw mut needed)
-            }
-            .as_bool()
-        );
+        unsafe { GetTokenInformation(token.as_raw(), TokenPrivileges, None, 0, &raw mut needed) }
+            .ok()
+            .map_err(|e| Error::win32(format!("GetTokenInformation1(tok={token}"), e))?;
 
         let mut info = AlignedAlloc::<TOKEN_PRIVILEGES>::new(try_from_usize!(needed));
         let mut written = 0;
-        if !unsafe {
+        unsafe {
             GetTokenInformation(
                 token.as_raw(),
                 TokenPrivileges,
@@ -139,14 +132,8 @@ impl PrivilegeManager {
                 &raw mut written,
             )
         }
-        .as_bool()
-        {
-            return Err(format!(
-                "GetTokenInformation failed w/ {}",
-                windows_core::Error::from_thread()
-            )
-            .into());
-        }
+        .ok()
+        .map_err(|e| Error::win32(format!("GetTokenInformation2(tok={token})"), e))?;
 
         if written != needed {
             return Err("size changed in between the two GetTokenInformation calls".into());
@@ -159,17 +146,22 @@ impl PrivilegeManager {
         let mut privileges = HashMap::new();
         for luid in luids {
             let mut name_len = 0;
-            assert!(
-                !unsafe {
-                    LookupPrivilegeNameA(None, &raw const luid.Luid, None, &raw mut name_len)
-                }
-                .as_bool()
-            );
+            unsafe { LookupPrivilegeNameA(None, &raw const luid.Luid, None, &raw mut name_len) }
+                .ok()
+                .map_err(|e| {
+                    Error::win32(
+                        format!(
+                            "LookupPrivilegeNameA1(luid={:#x}{:#x}",
+                            luid.Luid.HighPart, luid.Luid.LowPart
+                        ),
+                        e,
+                    )
+                })?;
 
             let name_len = try_from_usize!(name_len).clamp(1, MAX_PRIVILEGE_NAME_LEN);
             let mut name = vec![0u8; name_len];
             let mut name_len_u32 = try_from!(u32, name_len);
-            if !unsafe {
+            unsafe {
                 LookupPrivilegeNameA(
                     None,
                     &raw const luid.Luid,
@@ -177,14 +169,16 @@ impl PrivilegeManager {
                     &raw mut name_len_u32,
                 )
             }
-            .as_bool()
-            {
-                return Err(format!(
-                    "LookupPrivilegeNameA failed w/ {}",
-                    windows_core::Error::from_thread()
+            .ok()
+            .map_err(|e| {
+                Error::win32(
+                    format!(
+                        "LookupPrivilegeNameA1(luid={:#x}{:#x}",
+                        luid.Luid.HighPart, luid.Luid.LowPart
+                    ),
+                    e,
                 )
-                .into());
-            }
+            })?;
 
             let name = CString::from_vec_with_nul(name)?;
             let enabled = (luid.Attributes & SE_PRIVILEGE_ENABLED) != 0;
@@ -204,7 +198,7 @@ impl PrivilegeManager {
         privs.Privileges[0].Luid = *luid;
         privs.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
 
-        if !unsafe {
+        unsafe {
             AdjustTokenPrivileges(
                 self.token.as_raw(),
                 false,
@@ -214,19 +208,26 @@ impl PrivilegeManager {
                 None,
             )
         }
-        .as_bool()
-        {
-            return Err(format!(
-                "AdjustTokenPrivileges failed w/ {}",
-                windows_core::Error::from_thread()
+        .ok()
+        .map_err(|e| {
+            Error::win32(
+                format!(
+                    "AdjustTokenPrivileges(tok={}, luid={:#x}{:#x})",
+                    self.token, luid.HighPart, luid.LowPart
+                ),
+                e,
             )
-            .into());
-        }
+        })?;
 
-        if unsafe { GetLastError() } == ERROR_NOT_ALL_ASSIGNED {
-            return Err(
-                "AdjustTokenPrivileges() succeeded but not all privileges were assigned; are you admin?".into(),
-            );
+        let e = windows_core::WIN32_ERROR::from_thread();
+        if e.0 == ERROR_NOT_ALL_ASSIGNED {
+            return Err(Error::win32(
+                format!(
+                    "AdjustTokenPrivileges(tok={}, luid={:#x}{:#x}) succedded but privs ere not assigned; are you admin?",
+                    self.token, luid.HighPart, luid.LowPart
+                ),
+                e.into(),
+            ));
         }
 
         self.privileges

@@ -10,7 +10,6 @@ ERROR_NO_MORE_FILES
 E_ACCESSDENIED
 GetConsoleMode
 GetCurrentProcess
-GetLastError
 GetProcessId
 GetProcessWorkingSetSizeEx
 GetStdHandle

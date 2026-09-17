@@ -136,26 +136,24 @@ fn main() {
     let pid_or_name = args.nth(1).unwrap();
     match open_and_lockmem(&pid_or_name) {
         Ok(()) => {}
-        Err(Error::Win32(e)) => {
-            if e.code() == E_ACCESSDENIED {
-                println!("got access denied.. trying to get SeDebugPrivilege..");
-                match PRIVILEGE_MANAGER.lock().unwrap().set_sedebug() {
-                    Ok(()) => {
-                        println!("got SeDebugPrivilege, trying again..");
-                        if let Err(e) = open_and_lockmem(&pid_or_name) {
-                            println!("failed again w/ {e}; maybe PPL?");
-                        }
-                    }
-                    Err(e) => {
-                        println!(
-                            "couldn't get SeDebugPrivilege (failed w/ {e}), try from an admin prompt?"
-                        );
+        Err(Error::Win32 { e, .. }) if e.code() == E_ACCESSDENIED => {
+            println!("got access denied.. trying to get SeDebugPrivilege..");
+            match PRIVILEGE_MANAGER.lock().unwrap().set_sedebug() {
+                Ok(()) => {
+                    println!("got SeDebugPrivilege, trying again..");
+                    if let Err(e) = open_and_lockmem(&pid_or_name) {
+                        println!("failed again w/ {e}; maybe PPL?");
                     }
                 }
-            } else {
-                println!("got {e} while attempting to lockmem");
+                Err(e) => {
+                    println!(
+                        "couldn't get SeDebugPrivilege (failed w/ {e}), try from an admin prompt?"
+                    );
+                }
             }
         }
-        Err(e) => println!("failed to open process: {e}"),
+        Err(e) => {
+            println!("failed to lockmem: {e}");
+        }
     }
 }

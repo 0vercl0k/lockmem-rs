@@ -8,13 +8,31 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
-    Win32(windows_core::Error),
+    Win32 {
+        e: windows_core::Error,
+        extras: String,
+    },
     Other(Box<dyn std::error::Error>),
 }
 
-impl From<windows_core::Error> for Error {
-    fn from(value: windows_core::Error) -> Self {
-        Error::Win32(value)
+impl Error {
+    pub fn win32(extras: impl Into<String>, e: windows_core::Error) -> Self {
+        Self::Win32 {
+            e,
+            extras: extras.into(),
+        }
+    }
+}
+
+impl From<&str> for Error {
+    fn from(value: &str) -> Self {
+        Error::Other(value.into())
+    }
+}
+
+impl From<String> for Error {
+    fn from(value: String) -> Self {
+        Error::Other(value.into())
     }
 }
 
@@ -36,18 +54,6 @@ impl From<FromUtf8Error> for Error {
     }
 }
 
-impl From<&str> for Error {
-    fn from(value: &str) -> Self {
-        Error::Other(value.into())
-    }
-}
-
-impl From<String> for Error {
-    fn from(value: String) -> Self {
-        Error::Other(value.into())
-    }
-}
-
 impl From<FromVecWithNulError> for Error {
     fn from(value: FromVecWithNulError) -> Self {
         Error::Other(value.into())
@@ -57,8 +63,8 @@ impl From<FromVecWithNulError> for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Win32(error) => write!(f, "{error:?}"),
-            Error::Other(error) => write!(f, "{error:?}"),
+            Error::Win32 { e, extras } => write!(f, "{extras}: {e}"),
+            Error::Other(error) => write!(f, "{error}"),
         }
     }
 }

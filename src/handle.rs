@@ -1,4 +1,5 @@
 // Axel '0vercl0k' Souchet - August 20 2023
+use std::fmt::Display;
 use std::path::PathBuf;
 
 use log::debug;
@@ -10,6 +11,7 @@ use crate::bindings_sys::{
     MAX_PATH, NtQueryObject, ObjectTypeInformation, PUBLIC_OBJECT_TYPE_INFORMATION,
     QueryFullProcessImageNameW, STATUS_INFO_LENGTH_MISMATCH,
 };
+use crate::error::Error;
 use crate::utils::AlignedAlloc;
 use crate::{Result, try_from, try_from_usize};
 
@@ -30,6 +32,12 @@ impl Default for Handle {
             handle: INVALID_HANDLE_VALUE,
             owned: false,
         }
+    }
+}
+
+impl Display for Handle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Handle({:#x})", self.handle.0.addr())
     }
 }
 
@@ -75,7 +83,8 @@ impl Handle {
                 DUPLICATE_SAME_ACCESS,
             )
         }
-        .ok()?;
+        .ok()
+        .map_err(|e| Error::win32(format!("failed to duplicate {handle}"), e))?;
 
         Ok(Handle::adopt(duplicated_handle))
     }
@@ -98,6 +107,12 @@ impl Drop for Handle {
 
 #[derive(Debug)]
 pub struct ProcessHandle(Handle);
+
+impl Display for ProcessHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProcessHandle({:#x})", self.0.as_raw().0.addr())
+    }
+}
 
 impl ProcessHandle {
     fn new(handle: Handle) -> Self {
@@ -176,7 +191,8 @@ impl ProcessHandle {
                 &raw mut buffer_len,
             )
         }
-        .ok()?;
+        .ok()
+        .map_err(|e| Error::win32(format!("QueryFullProcessImageNameW(h={self})"), e))?;
 
         let s = String::from_utf16(&buffer[..buffer_len as usize])?.to_lowercase();
 
