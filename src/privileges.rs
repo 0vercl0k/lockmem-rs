@@ -117,9 +117,14 @@ impl PrivilegeManager {
 
         let token = Handle::adopt(token);
         let mut needed = 0;
-        unsafe { GetTokenInformation(token.as_raw(), TokenPrivileges, None, 0, &raw mut needed) }
-            .ok()
-            .map_err(|e| Error::win32(format!("GetTokenInformation1(tok={token}"), e))?;
+        if unsafe { GetTokenInformation(token.as_raw(), TokenPrivileges, None, 0, &raw mut needed) }
+            .as_bool()
+        {
+            return Err(format!(
+                "GetTokenInformation1(tok={token}) succeeded but was expected to fail"
+            )
+            .into());
+        }
 
         let mut info = AlignedAlloc::<TOKEN_PRIVILEGES>::new(try_from_usize!(needed));
         let mut written = 0;
@@ -146,17 +151,15 @@ impl PrivilegeManager {
         let mut privileges = HashMap::new();
         for luid in luids {
             let mut name_len = 0;
-            unsafe { LookupPrivilegeNameA(None, &raw const luid.Luid, None, &raw mut name_len) }
-                .ok()
-                .map_err(|e| {
-                    Error::win32(
-                        format!(
-                            "LookupPrivilegeNameA1(luid={:#x}{:#x}",
-                            luid.Luid.HighPart, luid.Luid.LowPart
-                        ),
-                        e,
-                    )
-                })?;
+            if unsafe { LookupPrivilegeNameA(None, &raw const luid.Luid, None, &raw mut name_len) }
+                .as_bool()
+            {
+                return Err(format!(
+                    "LookupPrivilegeNameA1(luid={:#x}{:#x}) succeeded but was expected to fail",
+                    luid.Luid.HighPart, luid.Luid.LowPart
+                )
+                .into());
+            }
 
             let name_len = try_from_usize!(name_len).clamp(1, MAX_PRIVILEGE_NAME_LEN);
             let mut name = vec![0u8; name_len];
@@ -223,7 +226,7 @@ impl PrivilegeManager {
         if e.0 == ERROR_NOT_ALL_ASSIGNED {
             return Err(Error::win32(
                 format!(
-                    "AdjustTokenPrivileges(tok={}, luid={:#x}{:#x}) succedded but privs ere not assigned; are you admin?",
+                    "AdjustTokenPrivileges(tok={}, luid={:#x}{:#x}) succedded but privs were not assigned; are you admin?",
                     self.token, luid.HighPart, luid.LowPart
                 ),
                 e.into(),
