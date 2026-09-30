@@ -173,7 +173,7 @@ impl PrivilegeManager {
             .map_err(|e| {
                 Error::win32(
                     format!(
-                        "LookupPrivilegeNameA1(luid={:#x}{:#x}",
+                        "LookupPrivilegeNameA2(luid={:#x}{:#x}",
                         luid.Luid.HighPart, luid.Luid.LowPart
                     ),
                     e,
