@@ -5,7 +5,7 @@
   </p>
   <p>
     <a href="https://crates.io/crates/lockmem-rs"><img src="https://img.shields.io/crates/v/lockmem-rs.svg" /></a>
-    <img src='https://github.com/0vercl0k/lockmem-rs/workflows/Builds/badge.svg?branch=main'/>
+    <img src='https://github.com/0vercl0k/lockmem-rs/actions/workflows/lockmem-rs.yml/badge.svg?branch=main'/>
   </p>
   <p>
     <img src='pics/lockmem-rs.webp'/>
